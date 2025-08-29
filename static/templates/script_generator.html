@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>AI Voice Script Generator</title>
+  <link rel="stylesheet" href="/static/styles.css">
+  <style>
+    .script-output {
+      background: #f8f9fa;
+      border: 1px solid #dee2e6;
+      border-radius: 8px;
+      padding: 20px;
+      margin-top: 20px;
+      font-family: 'Courier New', monospace;
+      line-height: 1.6;
+    }
+    .script-meta {
+      background: #e9ecef;
+      padding: 10px;
+      border-radius: 6px;
+      margin-bottom: 15px;
+      font-size: 14px;
+    }
+    .loading {
+      display: none;
+      text-align: center;
+      color: #007bff;
+      font-style: italic;
+    }
+    .error {
+      background: #f8d7da;
+      color: #721c24;
+      padding: 15px;
+      border-radius: 6px;
+      margin-top: 15px;
+    }
+    .navigation {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    .navigation a {
+      color: #007bff;
+      text-decoration: none;
+      margin: 0 10px;
+      padding: 8px 16px;
+      border: 1px solid #007bff;
+      border-radius: 6px;
+      display: inline-block;
+    }
+    .navigation a:hover {
+      background: #007bff;
+      color: white;
+    }
+    .navigation a.active {
+      background: #007bff;
+      color: white;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🎙️ AI Voice Script Generator</h1>
+    
+    <div class="navigation">
+      <a href="/">📹 Video Annotations</a>
+      <a href="/script-generator" class="active">🎙️ Script Generator</a>
+    </div>
+    
+    <!-- Script Generation Form -->
+    <section>
+      <h2>Generate Voice Script</h2>
+      <form id="scriptForm">
+        <input 
+          type="number" 
+          id="duration" 
+          placeholder="Duration (seconds)" 
+          step="0.1" 
+          min="1"
+          required
+        >
+        <textarea 
+          id="annotation" 
+          placeholder="Enter the annotation/description for this video segment..." 
+          rows="4"
+          required
+        ></textarea>
+        <button type="submit" id="generateBtn">🎯 Generate Script</button>
+      </form>
+      
+      <div id="loading" class="loading">
+        <p>🤖 AI is generating your script... This may take a few seconds.</p>
+      </div>
+      
+      <div id="error" class="error" style="display: none;"></div>
+      
+      <div id="scriptOutput" class="script-output" style="display: none;">
+        <div id="scriptMeta" class="script-meta"></div>
+        <div id="scriptText"></div>
+      </div>
+    </section>
+    
+    <!-- Quick Selection from Existing Annotations -->
+    <section>
+      <h2>📝 Or Use Existing Annotations</h2>
+      <select id="videoSelect">
+        <option value="">-- Select a video --</option>
+      </select>
+      <select id="annotationSelect" style="margin-top: 10px;">
+        <option value="">-- Select an annotation --</option>
+      </select>
+      <button type="button" id="useAnnotationBtn" style="margin-top: 10px;">Use This Annotation</button>
+    </section>
+  </div>
+  
+  <script>
+    const apiBase = "";
+    
+    // Enhanced fetch with error handling
+    async function apiRequest(url, options = {}) {
+      try {
+        const response = await fetch(`${apiBase}${url}`, options);
+        
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`HTTP ${response.status}: ${errorText}`);
+        }
+        
+        const data = await response.json();
+        return data;
+      } catch (error) {
+        console.error("API Error:", error);
+        throw error;
+      }
+    }
+    
+    // Show/hide loading state
+    function setLoading(isLoading) {
+      document.getElementById("loading").style.display = isLoading ? "block" : "none";
+      document.getElementById("generateBtn").disabled = isLoading;
+      document.getElementById("generateBtn").textContent = isLoading ? "⏳ Generating..." : "🎯 Generate Script";
+    }
+    
+    // Show error message
+    function showError(message) {
+      const errorDiv = document.getElementById("error");
+      errorDiv.textContent = message;
+      errorDiv.style.display = "block";
+      setTimeout(() => {
+        errorDiv.style.display = "none";
+      }, 5000);
+    }
+    
+    // Display generated script
+    function displayScript(data) {
+      const metaDiv = document.getElementById("scriptMeta");
+      const textDiv = document.getElementById("scriptText");
+      const outputDiv = document.getElementById("scriptOutput");
+      
+      metaDiv.innerHTML = `
+        <strong>📊 Script Details:</strong><br>
+        Duration: ${data.duration} seconds<br>
+        Word Count: ~${data.estimated_word_count} words<br>
+        Based on: "${data.annotation.substring(0, 100)}${data.annotation.length > 100 ? '...' : ''}"
+      `;
+      
+      textDiv.innerHTML = `<strong>📜 Generated Script:</strong><br><br>${data.script}`;
+      outputDiv.style.display = "block";
+      
+      // Scroll to results
+      outputDiv.scrollIntoView({ behavior: 'smooth' });
+    }
+    
+    // Generate script form handler
+    document.getElementById("scriptForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      
+      const duration = parseFloat(document.getElementById("duration").value);
+      const annotation = document.getElementById("annotation").value.trim();
+      
+      if (!duration || !annotation) {
+        showError("Please fill in both duration and annotation fields.");
+        return;
+      }
+      
+      setLoading(true);
+      document.getElementById("scriptOutput").style.display = "none";
+      
+      try {
+        const data = await apiRequest("/generate-script", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ duration, annotation })
+        });
+        
+        displayScript(data);
+      } catch (error) {
+        showError(`Failed to generate script: ${error.message}`);
+      } finally {
+        setLoading(false);
+      }
+    });
+    
+    // Load videos for quick selection
+    async function loadVideos() {
+      try {
+        const videos = await apiRequest("/videos");
+        const select = document.getElementById("videoSelect");
+        select.innerHTML = `<option value="">-- Select a video --</option>`;
+        videos.forEach(v => {
+          select.innerHTML += `<option value="${v.id}">${v.title}</option>`;
+        });
+      } catch (error) {
+        console.error("Failed to load videos:", error);
+      }
+    }
+    
+    // Load annotations when video is selected
+    document.getElementById("videoSelect").addEventListener("change", async (e) => {
+      const videoId = e.target.value;
+      const annotationSelect = document.getElementById("annotationSelect");
+      
+      if (!videoId) {
+        annotationSelect.innerHTML = `<option value="">-- Select an annotation --</option>`;
+        return;
+      }
+      
+      try {
+        const annotations = await apiRequest(`/videos/${videoId}/annotations`);
+        annotationSelect.innerHTML = `<option value="">-- Select an annotation --</option>`;
+        annotations.forEach(a => {
+          annotationSelect.innerHTML += `
+            <option value='${JSON.stringify(a)}'>
+              [${a.start_time}s - ${a.end_time}s] ${a.description.substring(0, 50)}${a.description.length > 50 ? '...' : ''}
+            </option>`;
+        });
+      } catch (error) {
+        showError("Failed to load annotations");
+      }
+    });
+    
+    // Use selected annotation
+    document.getElementById("useAnnotationBtn").addEventListener("click", () => {
+      const annotationSelect = document.getElementById("annotationSelect");
+      const selectedValue = annotationSelect.value;
+      
+      if (!selectedValue) {
+        showError("Please select an annotation first");
+        return;
+      }
+      
+      try {
+        const annotation = JSON.parse(selectedValue);
+        document.getElementById("duration").value = annotation.duration;
+        document.getElementById("annotation").value = annotation.description;
+        
+        // Scroll to form
+        document.getElementById("scriptForm").scrollIntoView({ behavior: 'smooth' });
+      } catch (error) {
+        showError("Error loading annotation data");
+      }
+    });
+    
+    // Initial load
+    loadVideos();
+  </script>
+</body>
+</html>

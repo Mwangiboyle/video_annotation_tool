@@ -1,6 +1,4 @@
 # %%
-
-
 import os
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse
@@ -8,17 +6,23 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from dotenv import load_dotenv
 from supabase import create_client, Client
-from models import VideoCreate, AnnotationCreate, Annotation
+from models import VideoCreate, AnnotationCreate, Annotation, ScriptGenerateRequest
 from typing import List
 import uvicorn
 from fastapi.middleware.cors import CORSMiddleware
+import openai
 
 
 # Load env vars
 load_dotenv()
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+
+# Initialize OpenAI client
+openai.api_key = OPENAI_API_KEY
 
 app = FastAPI(title="Video Timestamp Annotation Tool")
 
@@ -38,7 +42,11 @@ templates = Jinja2Templates(directory="static/templates")
 def home(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
 
-# --- API Endpoints (reuse from before) ---
+@app.get("/script-generator", response_class=HTMLResponse)
+def script_generator(request: Request):
+    return templates.TemplateResponse("script_generator.html", {"request": request})
+
+# --- API Endpoints (existing) ---
 
 @app.post("/videos")
 def create_video(video: VideoCreate):
@@ -92,6 +100,55 @@ def list_annotations(video_id: str):
     data = supabase.table("annotations").select("*").eq("video_id", video_id).execute()
     return data.data
 
+# --- New OpenAI Script Generation Endpoint ---
+
+@app.post("/generate-script")
+async def generate_script(request: ScriptGenerateRequest):
+    if not OPENAI_API_KEY:
+        raise HTTPException(status_code=500, detail="OpenAI API key not configured")
+
+    try:
+        # Create prompt for OpenAI
+        prompt = f"""
+        Create a voice script for a video segment with the following details:
+
+        Duration: {request.duration} seconds
+        Description/Context: {request.annotation}
+
+        Additional requirements:
+        - The script should be exactly {request.duration} seconds when read at a normal pace (approximately 150-180 words per minute)
+        - Make it engaging and natural for voice narration
+        - Focus on the key points mentioned in the description
+        - Include appropriate pauses and transitions
+
+        Please provide only the script text, no additional formatting or explanations.
+        """
+
+        # Use OpenAI API (updated for newer versions)
+        response = openai.chat.completions.create(
+            model="gpt-3.5-turbo",  # or "gpt-4" if you prefer
+            messages=[
+                {"role": "system", "content": "You are a professional scriptwriter specializing in voice-over scripts for video content."},
+                {"role": "user", "content": prompt}
+            ],
+            max_tokens=500,
+            temperature=0.7
+        )
+
+        script = response.choices[0].message.content.strip()
+
+        return {
+            "script": script,
+            "duration": request.duration,
+            "annotation": request.annotation,
+            "estimated_word_count": len(script.split())
+        }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error generating script: {str(e)}")
+
+if __name__ == "__main__":
+    uvicorn.run(app, port=8000)
 if __name__ == "__main__":
     uvicorn.run(app, port=8000)
 

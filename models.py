@@ -20,7 +20,6 @@ class Annotation(AnnotationCreate):
     video_id: str
     duration: float   # new field
 
-
-
-
-
+class ScriptGenerateRequest(BaseModel):
+    duration: float
+    annotation: str
