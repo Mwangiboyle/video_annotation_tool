@@ -74,6 +74,24 @@
       <h2>Annotations</h2>
       <ul id="annotationList"></ul>
     </section>
+    
+    <!-- Edit Annotation Modal -->
+    <div id="editModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000;">
+      <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 20px; border-radius: 12px; width: 400px; max-width: 90%;">
+        <h3>Edit Annotation</h3>
+        <form id="editAnnotationForm">
+          <input type="hidden" id="editAnnotationId">
+          <input type="number" id="editStartTime" placeholder="Start (sec)" step="0.1" required>
+          <input type="number" id="editEndTime" placeholder="End (sec)" step="0.1" required>
+          <textarea id="editDescription" placeholder="Description" required rows="3"></textarea>
+          <div style="margin-top: 15px;">
+            <button type="submit" style="background: #28a745;">Save Changes</button>
+            <button type="button" id="cancelEdit" style="background: #6c757d; margin-left: 10px;">Cancel</button>
+            <button type="button" id="deleteAnnotation" style="background: #dc3545; margin-left: 10px;">Delete</button>
+          </div>
+        </form>
+      </div>
+    </div>
   </div>
   
   <script>
@@ -185,13 +203,78 @@
         const list = document.getElementById("annotationList");
         list.innerHTML = "";
         annotations.forEach(a => {
-          list.innerHTML += `<li>[${a.start_time}s - ${a.end_time}s] (Duration: ${a.duration}s) → ${a.description}</li>`;
+          list.innerHTML += `
+            <li style="position: relative; cursor: pointer;" onclick="openEditModal('${a.id}', ${a.start_time}, ${a.end_time}, '${a.description.replace(/'/g, "\\'")}')">
+              [${a.start_time}s - ${a.end_time}s] (Duration: ${a.duration}s) → ${a.description}
+              <span style="color: #007bff; font-size: 12px; margin-left: 10px;">✏️ Click to edit</span>
+            </li>`;
         });
         updateDebug(`Loaded ${annotations.length} annotations`);
       } catch (error) {
         updateDebug(`Failed to load annotations: ${error.message}`);
       }
     }
+    
+    // Edit annotation functions
+    function openEditModal(id, startTime, endTime, description) {
+      document.getElementById("editAnnotationId").value = id;
+      document.getElementById("editStartTime").value = startTime;
+      document.getElementById("editEndTime").value = endTime;
+      document.getElementById("editDescription").value = description;
+      document.getElementById("editModal").style.display = "block";
+    }
+    
+    function closeEditModal() {
+      document.getElementById("editModal").style.display = "none";
+    }
+    
+    // Edit form handler
+    document.getElementById("editAnnotationForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const id = document.getElementById("editAnnotationId").value;
+      const start_time = parseFloat(document.getElementById("editStartTime").value);
+      const end_time = parseFloat(document.getElementById("editEndTime").value);
+      const description = document.getElementById("editDescription").value;
+      
+      try {
+        await apiRequest(`/annotations/${id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ start_time, end_time, description })
+        });
+        
+        closeEditModal();
+        const videoId = document.getElementById("videoSelect").value;
+        if (videoId) loadAnnotations(videoId);
+        updateDebug("Annotation updated successfully");
+      } catch (error) {
+        updateDebug(`Failed to update annotation: ${error.message}`);
+      }
+    });
+    
+    // Cancel edit
+    document.getElementById("cancelEdit").addEventListener("click", closeEditModal);
+    
+    // Delete annotation
+    document.getElementById("deleteAnnotation").addEventListener("click", async () => {
+      if (!confirm("Are you sure you want to delete this annotation?")) return;
+      
+      const id = document.getElementById("editAnnotationId").value;
+      try {
+        await apiRequest(`/annotations/${id}`, { method: "DELETE" });
+        closeEditModal();
+        const videoId = document.getElementById("videoSelect").value;
+        if (videoId) loadAnnotations(videoId);
+        updateDebug("Annotation deleted successfully");
+      } catch (error) {
+        updateDebug(`Failed to delete annotation: ${error.message}`);
+      }
+    });
+    
+    // Close modal when clicking outside
+    document.getElementById("editModal").addEventListener("click", (e) => {
+      if (e.target.id === "editModal") closeEditModal();
+    });
     
     // Initial load
     updateDebug("Page loaded, attempting to load videos...");

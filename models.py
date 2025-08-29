@@ -23,3 +23,15 @@ class Annotation(AnnotationCreate):
 class ScriptGenerateRequest(BaseModel):
     duration: float
     annotation: str
+
+class VoiceScriptCreate(BaseModel):
+    video_id: str
+    annotation_id: Optional[str] = None
+    duration: float
+    original_annotation: str
+    generated_script: str
+    order_index: Optional[int] = None
+
+class VoiceScript(VoiceScriptCreate):
+    id: str
+    created_at: str

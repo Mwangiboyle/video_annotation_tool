@@ -14,6 +14,23 @@
       font-family: 'Courier New', monospace;
       line-height: 1.6;
     }
+    .script-text-area {
+      width: 100%;
+      min-height: 200px;
+      font-family: 'Courier New', monospace;
+      line-height: 1.6;
+      padding: 15px;
+      border: 1px solid #dee2e6;
+      border-radius: 6px;
+      resize: vertical;
+    }
+    .script-actions {
+      margin-top: 15px;
+      text-align: center;
+    }
+    .script-actions button {
+      margin: 0 10px;
+    }
     .script-meta {
       background: #e9ecef;
       padding: 10px;
@@ -95,9 +112,35 @@
       
       <div id="scriptOutput" class="script-output" style="display: none;">
         <div id="scriptMeta" class="script-meta"></div>
-        <div id="scriptText"></div>
+        <textarea id="scriptText" class="script-text-area" placeholder="Generated script will appear here..."></textarea>
+        <div class="script-actions">
+          <button type="button" id="saveScriptBtn" style="background: #28a745;">💾 Save Script</button>
+          <button type="button" id="regenerateBtn" style="background: #17a2b8;">🔄 Regenerate</button>
+        </div>
       </div>
     </section>
+    
+    <!-- Saved Voice Scripts Section -->
+    <section>
+      <h2>💾 Saved Voice Scripts</h2>
+      <select id="savedScriptsVideo" style="margin-bottom: 15px;">
+        <option value="">-- Select a video to view scripts --</option>
+      </select>
+      <div id="savedScriptsList"></div>
+      <button type="button" id="combineScriptsBtn" style="margin-top: 15px; background: #6f42c1; display: none;">🎬 View Combined Script</button>
+    </section>
+    
+    <!-- Combined Script Modal -->
+    <div id="combinedModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1000;">
+      <div style="position: absolute; top: 5%; left: 5%; width: 90%; height: 90%; background: white; border-radius: 12px; padding: 20px; overflow-y: auto;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+          <h2>🎬 Combined Voice Script</h2>
+          <button type="button" id="closeCombinedModal" style="background: #dc3545;">✖ Close</button>
+        </div>
+        <div id="combinedScriptMeta" style="background: #e9ecef; padding: 15px; border-radius: 8px; margin-bottom: 20px;"></div>
+        <textarea id="combinedScriptText" style="width: 100%; height: 60%; font-family: 'Courier New', monospace; line-height: 1.6; padding: 15px; border: 1px solid #dee2e6; border-radius: 6px; resize: none;" readonly></textarea>
+      </div>
+    </div>
     
     <!-- Quick Selection from Existing Annotations -->
     <section>
@@ -153,7 +196,7 @@
     // Display generated script
     function displayScript(data) {
       const metaDiv = document.getElementById("scriptMeta");
-      const textDiv = document.getElementById("scriptText");
+      const textArea = document.getElementById("scriptText");
       const outputDiv = document.getElementById("scriptOutput");
       
       metaDiv.innerHTML = `
@@ -163,8 +206,15 @@
         Based on: "${data.annotation.substring(0, 100)}${data.annotation.length > 100 ? '...' : ''}"
       `;
       
-      textDiv.innerHTML = `<strong>📜 Generated Script:</strong><br><br>${data.script}`;
+      textArea.value = data.script;
       outputDiv.style.display = "block";
+      
+      // Store current script data for saving
+      window.currentScriptData = {
+        duration: data.duration,
+        annotation: data.annotation,
+        script: data.script
+      };
       
       // Scroll to results
       outputDiv.scrollIntoView({ behavior: 'smooth' });
@@ -200,14 +250,170 @@
       }
     });
     
+    // Save script button
+    document.getElementById("saveScriptBtn").addEventListener("click", async () => {
+      const videoSelect = document.getElementById("videoSelect");
+      const annotationSelect = document.getElementById("annotationSelect");
+      
+      if (!videoSelect.value) {
+        showError("Please select a video first");
+        return;
+      }
+      
+      if (!window.currentScriptData) {
+        showError("No script to save");
+        return;
+      }
+      
+      try {
+        const scriptData = {
+          video_id: videoSelect.value,
+          annotation_id: annotationSelect.value ? JSON.parse(annotationSelect.value).id : null,
+          duration: window.currentScriptData.duration,
+          original_annotation: window.currentScriptData.annotation,
+          generated_script: document.getElementById("scriptText").value,
+          order_index: Date.now() // Simple ordering by creation time
+        };
+        
+        await apiRequest("/voice-scripts", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(scriptData)
+        });
+        
+        alert("✅ Script saved successfully!");
+        loadSavedScripts(videoSelect.value);
+      } catch (error) {
+        showError(`Failed to save script: ${error.message}`);
+      }
+    });
+    
+    // Regenerate script
+    document.getElementById("regenerateBtn").addEventListener("click", () => {
+      if (window.currentScriptData) {
+        document.getElementById("duration").value = window.currentScriptData.duration;
+        document.getElementById("annotation").value = window.currentScriptData.annotation;
+        document.getElementById("scriptForm").dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
+      }
+    });
+    
+    // Load saved scripts
+    document.getElementById("savedScriptsVideo").addEventListener("change", async (e) => {
+      const videoId = e.target.value;
+      if (videoId) {
+        loadSavedScripts(videoId);
+        document.getElementById("combineScriptsBtn").style.display = "block";
+      } else {
+        document.getElementById("savedScriptsList").innerHTML = "";
+        document.getElementById("combineScriptsBtn").style.display = "none";
+      }
+    });
+    
+    async function loadSavedScripts(videoId) {
+      try {
+        const scripts = await apiRequest(`/videos/${videoId}/voice-scripts`);
+        const container = document.getElementById("savedScriptsList");
+        
+        if (scripts.length === 0) {
+          container.innerHTML = "<p>No saved scripts for this video.</p>";
+          return;
+        }
+        
+        container.innerHTML = scripts.map(script => `
+          <div style="border: 1px solid #dee2e6; border-radius: 8px; padding: 15px; margin: 10px 0; background: white;">
+            <div style="font-weight: bold; margin-bottom: 10px;">
+              Duration: ${script.duration}s | 
+              ${script.annotation_id ? 'From Annotation' : 'Manual Entry'}
+              <button onclick="editScript('${script.id}')" style="float: right; background: #ffc107; padding: 4px 8px; font-size: 12px;">✏️ Edit</button>
+              <button onclick="deleteScript('${script.id}', '${videoId}')" style="float: right; background: #dc3545; padding: 4px 8px; font-size: 12px; margin-right: 5px;">🗑️ Delete</button>
+            </div>
+            <div style="font-size: 14px; color: #666; margin-bottom: 10px;">
+              Based on: "${script.original_annotation.substring(0, 100)}${script.original_annotation.length > 100 ? '...' : ''}"
+            </div>
+            <textarea readonly style="width: 100%; height: 80px; border: 1px solid #ccc; border-radius: 4px; padding: 8px; font-size: 12px; resize: none;">${script.generated_script}</textarea>
+          </div>
+        `).join('');
+      } catch (error) {
+        showError("Failed to load saved scripts");
+      }
+    }
+    
+    // Edit script function
+    window.editScript = async (scriptId) => {
+      const newScript = prompt("Edit the script:");
+      if (newScript !== null) {
+        try {
+          await apiRequest(`/voice-scripts/${scriptId}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ generated_script: newScript })
+          });
+          const videoId = document.getElementById("savedScriptsVideo").value;
+          loadSavedScripts(videoId);
+        } catch (error) {
+          showError("Failed to update script");
+        }
+      }
+    };
+    
+    // Delete script function
+    window.deleteScript = async (scriptId, videoId) => {
+      if (confirm("Are you sure you want to delete this script?")) {
+        try {
+          await apiRequest(`/voice-scripts/${scriptId}`, { method: "DELETE" });
+          loadSavedScripts(videoId);
+        } catch (error) {
+          showError("Failed to delete script");
+        }
+      }
+    };
+    
+    // View combined script
+    document.getElementById("combineScriptsBtn").addEventListener("click", async () => {
+      const videoId = document.getElementById("savedScriptsVideo").value;
+      if (!videoId) return;
+      
+      try {
+        const combined = await apiRequest(`/videos/${videoId}/combined-script`);
+        
+        document.getElementById("combinedScriptMeta").innerHTML = `
+          <strong>📊 Combined Script Summary:</strong><br>
+          Total Duration: ${combined.total_duration} seconds<br>
+          Number of Scripts: ${combined.script_count}<br>
+          Estimated Total Words: ~${combined.combined_script.split(' ').length}
+        `;
+        
+        document.getElementById("combinedScriptText").value = combined.combined_script;
+        document.getElementById("combinedModal").style.display = "block";
+      } catch (error) {
+        showError("Failed to load combined script");
+      }
+    });
+    
+    // Close combined modal
+    document.getElementById("closeCombinedModal").addEventListener("click", () => {
+      document.getElementById("combinedModal").style.display = "none";
+    });
+    
+    // Close modal when clicking outside
+    document.getElementById("combinedModal").addEventListener("click", (e) => {
+      if (e.target.id === "combinedModal") {
+        document.getElementById("combinedModal").style.display = "none";
+      }
+    
     // Load videos for quick selection
     async function loadVideos() {
       try {
         const videos = await apiRequest("/videos");
         const select = document.getElementById("videoSelect");
+        const savedSelect = document.getElementById("savedScriptsVideo");
+        
         select.innerHTML = `<option value="">-- Select a video --</option>`;
+        savedSelect.innerHTML = `<option value="">-- Select a video to view scripts --</option>`;
+        
         videos.forEach(v => {
           select.innerHTML += `<option value="${v.id}">${v.title}</option>`;
+          savedSelect.innerHTML += `<option value="${v.id}">${v.title}</option>`;
         });
       } catch (error) {
         console.error("Failed to load videos:", error);

@@ -1,4 +1,4 @@
-# %%
+
 import os
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse
@@ -6,7 +6,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from dotenv import load_dotenv
 from supabase import create_client, Client
-from models import VideoCreate, AnnotationCreate, Annotation, ScriptGenerateRequest
+from models import VideoCreate, AnnotationCreate, Annotation, ScriptGenerateRequest, VoiceScriptCreate, VoiceScript
 from typing import List
 import uvicorn
 from fastapi.middleware.cors import CORSMiddleware
@@ -100,6 +100,60 @@ def list_annotations(video_id: str):
     data = supabase.table("annotations").select("*").eq("video_id", video_id).execute()
     return data.data
 
+@app.delete("/annotations/{annotation_id}")
+def delete_annotation(annotation_id: str):
+    data = supabase.table("annotations").delete().eq("id", annotation_id).execute()
+    if not data.data:
+        raise HTTPException(status_code=404, detail="Annotation not found")
+    return {"message": "Annotation deleted successfully"}
+
+# --- Voice Scripts Endpoints ---
+
+@app.post("/voice-scripts", response_model=VoiceScript)
+def save_voice_script(script: VoiceScriptCreate):
+    data = supabase.table("voice_scripts").insert(script.model_dump()).execute()
+    if not data.data:
+        raise HTTPException(status_code=500, detail="Error saving voice script")
+    return data.data[0]
+
+@app.get("/videos/{video_id}/voice-scripts")
+def list_voice_scripts(video_id: str):
+    data = supabase.table("voice_scripts").select("*").eq("video_id", video_id).order("order_index").execute()
+    return data.data
+
+@app.put("/voice-scripts/{script_id}", response_model=VoiceScript)
+def update_voice_script(script_id: str, script_data: dict):
+    data = supabase.table("voice_scripts").update(script_data).eq("id", script_id).execute()
+    if not data.data:
+        raise HTTPException(status_code=404, detail="Voice script not found")
+    return data.data[0]
+
+@app.delete("/voice-scripts/{script_id}")
+def delete_voice_script(script_id: str):
+    data = supabase.table("voice_scripts").delete().eq("id", script_id).execute()
+    if not data.data:
+        raise HTTPException(status_code=404, detail="Voice script not found")
+    return {"message": "Voice script deleted successfully"}
+
+@app.get("/videos/{video_id}/combined-script")
+def get_combined_script(video_id: str):
+    """Get all voice scripts for a video combined into one"""
+    data = supabase.table("voice_scripts").select("*").eq("video_id", video_id).order("order_index").execute()
+    scripts = data.data
+
+    if not scripts:
+        return {"combined_script": "", "total_duration": 0, "script_count": 0}
+
+    combined_text = "\n\n".join([script["generated_script"] for script in scripts])
+    total_duration = sum([script["duration"] for script in scripts])
+
+    return {
+        "combined_script": combined_text,
+        "total_duration": total_duration,
+        "script_count": len(scripts),
+        "scripts": scripts
+    }
+
 # --- New OpenAI Script Generation Endpoint ---
 
 @app.post("/generate-script")
@@ -149,6 +203,3 @@ async def generate_script(request: ScriptGenerateRequest):
 
 if __name__ == "__main__":
     uvicorn.run(app, port=8000)
-if __name__ == "__main__":
-    uvicorn.run(app, port=8000)
-
