@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Video Annotation Tool</title>
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <div class="container">
+    <h1>🎬 Video Annotation Tool</h1>
+    
+    <!-- Debug info -->
+    <div id="debug" style="background: #f0f0f0; padding: 10px; margin-bottom: 20px;">
+      <h3>Debug Info:</h3>
+      <p>Current URL: <span id="currentUrl"></span></p>
+      <p>API Base: <span id="apiBaseDisplay"></span></p>
+      <p>Last Response: <span id="lastResponse"></span></p>
+    </div>
+    
+    <!-- Add new video -->
+    <section>
+      <h2>Add a New Video</h2>
+      <form id="videoForm">
+        <input type="text" id="title" placeholder="Video Title" required>
+        <input type="text" id="video_url" placeholder="Video URL (optional)">
+        <button type="submit">Save Video</button>
+      </form>
+    </section>
+    
+    <!-- Select video -->
+    <section>
+      <h2>Annotate a Video</h2>
+      <select id="videoSelect">
+        <option value="">-- Select a video --</option>
+      </select>
+      <form id="annotationForm" style="margin-top: 1em;">
+        <input type="number" id="start_time" placeholder="Start (sec)" step="0.1" required>
+        <input type="number" id="end_time" placeholder="End (sec)" step="0.1" required>
+        <input type="text" id="description" placeholder="Description" required>
+        <button type="submit">Save Annotation</button>
+      </form>
+    </section>
+    
+    <!-- Show annotations -->
+    <section>
+      <h2>Annotations</h2>
+      <ul id="annotationList"></ul>
+    </section>
+  </div>
+  
+  <script>
+   const apiBase = "";
+    
+    // Debug info
+    document.getElementById("currentUrl").textContent = window.location.href;
+    document.getElementById("apiBaseDisplay").textContent = apiBase || "empty (relative URLs)";
+    
+    function updateDebug(message) {
+      document.getElementById("lastResponse").textContent = message;
+      console.log("Debug:", message);
+    }
+    
+    // Enhanced fetch with error handling
+    async function apiRequest(url, options = {}) {
+      try {
+        updateDebug(`Making request to: ${apiBase}${url}`);
+        const response = await fetch(`${apiBase}${url}`, options);
+        
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        const data = await response.json();
+        updateDebug(`Success: ${JSON.stringify(data).substring(0, 100)}...`);
+        return data;
+      } catch (error) {
+        updateDebug(`Error: ${error.message}`);
+        console.error("API Error:", error);
+        alert(`API Error: ${error.message}`);
+        throw error;
+      }
+    }
+    
+    // Fetch and populate videos
+    async function loadVideos() {
+      try {
+        const videos = await apiRequest("/videos");
+        const select = document.getElementById("videoSelect");
+        select.innerHTML = `<option value="">-- Select a video --</option>`;
+        videos.forEach(v => {
+          select.innerHTML += `<option value="${v.id}">${v.title}</option>`;
+        });
+        updateDebug(`Loaded ${videos.length} videos`);
+      } catch (error) {
+        updateDebug(`Failed to load videos: ${error.message}`);
+      }
+    }
+    
+    // Add new video
+    document.getElementById("videoForm").addEventListener("submit", async e => {
+      e.preventDefault();
+      try {
+        const title = document.getElementById("title").value;
+        const video_url = document.getElementById("video_url").value;
+        
+        await apiRequest("/videos", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ title, video_url })
+        });
+        
+        document.getElementById("videoForm").reset();
+        loadVideos();
+        updateDebug("Video created successfully");
+      } catch (error) {
+        updateDebug(`Failed to create video: ${error.message}`);
+      }
+    });
+    
+    // Add annotation
+    document.getElementById("annotationForm").addEventListener("submit", async e => {
+      e.preventDefault();
+      const videoId = document.getElementById("videoSelect").value;
+      if (!videoId) { 
+        alert("Select a video first!"); 
+        return; 
+      }
+      
+      try {
+        const start_time = parseFloat(document.getElementById("start_time").value);
+        const end_time = parseFloat(document.getElementById("end_time").value);
+        const description = document.getElementById("description").value;
+        
+        await apiRequest(`/videos/${videoId}/annotations`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ start_time, end_time, description })
+        });
+        
+        document.getElementById("annotationForm").reset();
+        loadAnnotations(videoId);
+        updateDebug("Annotation created successfully");
+      } catch (error) {
+        updateDebug(`Failed to create annotation: ${error.message}`);
+      }
+    });
+    
+    // Load annotations for selected video
+    document.getElementById("videoSelect").addEventListener("change", e => {
+      const videoId = e.target.value;
+      if (videoId) loadAnnotations(videoId);
+    });
+    
+    async function loadAnnotations(videoId) {
+      try {
+        const annotations = await apiRequest(`/videos/${videoId}/annotations`);
+        const list = document.getElementById("annotationList");
+        list.innerHTML = "";
+        annotations.forEach(a => {
+          list.innerHTML += `<li>[${a.start_time} - ${a.end_time}] ${a.description}</li>`;
+        });
+        updateDebug(`Loaded ${annotations.length} annotations`);
+      } catch (error) {
+        updateDebug(`Failed to load annotations: ${error.message}`);
+      }
+    }
+    
+    // Initial load
+    updateDebug("Page loaded, attempting to load videos...");
+    loadVideos();
+  </script>
+</body>
+</html>
