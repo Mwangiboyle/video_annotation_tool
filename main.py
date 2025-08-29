@@ -54,11 +54,36 @@ def list_videos():
 
 @app.post("/videos/{video_id}/annotations", response_model=Annotation)
 def add_annotation(video_id: str, annotation: AnnotationCreate):
+    # Validation: prevent invalid timestamps
+    if annotation.end_time <= annotation.start_time:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid timestamps: end_time must be greater than start_time"
+        )
+
     duration = annotation.end_time - annotation.start_time
     new_data = {**annotation.model_dump(), "video_id": video_id, "duration": duration}
     data = supabase.table("annotations").insert(new_data).execute()
     if not data.data:
         raise HTTPException(status_code=500, detail="Error inserting annotation")
+    return data.data[0]
+
+@app.put("/annotations/{annotation_id}", response_model=Annotation)
+def update_annotation(annotation_id: str, annotation: AnnotationCreate):
+    # Validation: prevent invalid timestamps
+    if annotation.end_time <= annotation.start_time:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid timestamps: end_time must be greater than start_time"
+        )
+
+    # Calculate duration
+    duration = annotation.end_time - annotation.start_time
+    update_data = {**annotation.model_dump(), "duration": duration}
+
+    data = supabase.table("annotations").update(update_data).eq("id", annotation_id).execute()
+    if not data.data:
+        raise HTTPException(status_code=404, detail="Annotation not found")
     return data.data[0]
 
 
