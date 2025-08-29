@@ -1,12 +1,14 @@
+# %%
+
 from pydantic import BaseModel
-from typing import Optional, List
+from typing import Optional
 
 class VideoCreate(BaseModel):
     title: str
     video_url: Optional[str] = None
 
 class Video(VideoCreate):
-    id: int
+    id: str   # UUID in Supabase
 
 class AnnotationCreate(BaseModel):
     start_time: float
@@ -14,8 +16,10 @@ class AnnotationCreate(BaseModel):
     description: str
 
 class Annotation(AnnotationCreate):
-    id: int
-    video_id: int
+    id: str
+    video_id: str
+    duration: float   # new field
+
 
 
 

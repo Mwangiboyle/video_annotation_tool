@@ -49,7 +49,7 @@
   </div>
   
   <script>
-   const apiBase = "";
+    const apiBase = "";
     
     // Debug info
     document.getElementById("currentUrl").textContent = window.location.href;
@@ -157,7 +157,7 @@
         const list = document.getElementById("annotationList");
         list.innerHTML = "";
         annotations.forEach(a => {
-          list.innerHTML += `<li>[${a.start_time} - ${a.end_time}] ${a.description}</li>`;
+          list.innerHTML += `<li>[${a.start_time}s - ${a.end_time}s] (Duration: ${a.duration}s) → ${a.description}</li>`;
         });
         updateDebug(`Loaded ${annotations.length} annotations`);
       } catch (error) {

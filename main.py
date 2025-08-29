@@ -8,7 +8,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from dotenv import load_dotenv
 from supabase import create_client, Client
-from models import VideoCreate, AnnotationCreate
+from models import VideoCreate, AnnotationCreate, Annotation
 from typing import List
 import uvicorn
 from fastapi.middleware.cors import CORSMiddleware
@@ -52,13 +52,15 @@ def list_videos():
     data = supabase.table("videos").select("*").execute()
     return data.data
 
-@app.post("/videos/{video_id}/annotations")
+@app.post("/videos/{video_id}/annotations", response_model=Annotation)
 def add_annotation(video_id: str, annotation: AnnotationCreate):
-    new_data = {**annotation.model_dump(), "video_id": video_id}
+    duration = annotation.end_time - annotation.start_time
+    new_data = {**annotation.model_dump(), "video_id": video_id, "duration": duration}
     data = supabase.table("annotations").insert(new_data).execute()
     if not data.data:
         raise HTTPException(status_code=500, detail="Error inserting annotation")
     return data.data[0]
+
 
 @app.get("/videos/{video_id}/annotations")
 def list_annotations(video_id: str):
