@@ -86,6 +86,78 @@
       border-radius: 6px;
       margin-top: 15px;
     }
+    
+    /* Audio-related styles */
+    .audio-controls {
+      background: #e3f2fd;
+      border: 1px solid #2196f3;
+      border-radius: 8px;
+      padding: 15px;
+      margin-top: 15px;
+    }
+    .audio-settings {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 15px;
+    }
+    .audio-player {
+      width: 100%;
+      margin: 10px 0;
+    }
+    .script-item {
+      border: 1px solid #dee2e6;
+      border-radius: 8px;
+      padding: 15px;
+      margin: 10px 0;
+      background: white;
+      position: relative;
+    }
+    .script-item.has-audio {
+      border-left: 4px solid #28a745;
+      background: #f8fff9;
+    }
+    .script-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+      font-weight: bold;
+    }
+    .script-actions-inline {
+      display: flex;
+      gap: 5px;
+    }
+    .script-actions-inline button {
+      padding: 4px 8px;
+      font-size: 12px;
+    }
+    .audio-status {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: bold;
+    }
+    .audio-status.available {
+      background: #d4edda;
+      color: #155724;
+    }
+    .audio-status.generating {
+      background: #fff3cd;
+      color: #856404;
+    }
+    .audio-status.unavailable {
+      background: #f8d7da;
+      color: #721c24;
+    }
+    .batch-audio-section {
+      background: #f0f8ff;
+      border: 1px solid #4169e1;
+      border-radius: 8px;
+      padding: 20px;
+      margin: 20px 0;
+    }
   </style>
 </head>
 <body>
@@ -96,7 +168,7 @@
     <div class="tab-container">
       <button class="tab-button active" onclick="showTab('annotations')">📹 Video Annotations</button>
       <button class="tab-button" onclick="showTab('script-generator')">🎙️ AI Script Generator</button>
-      <button class="tab-button" onclick="showTab('saved-scripts')">💾 Saved Scripts</button>
+      <button class="tab-button" onclick="showTab('saved-scripts')">💾 Saved Scripts & Audio</button>
     </div>
 
     <!-- Annotations Tab -->
@@ -195,6 +267,37 @@
             <button type="button" id="saveScriptBtn" style="background: #28a745;">💾 Save Script</button>
             <button type="button" id="regenerateBtn" style="background: #17a2b8;">🔄 Regenerate</button>
           </div>
+          
+          <!-- Audio Generation Controls -->
+          <div class="audio-controls">
+            <h4>🎵 Generate Audio</h4>
+            <div class="audio-settings">
+              <div>
+                <label>Voice:</label>
+                <select id="voiceSelect">
+                  <option value="alloy">Alloy</option>
+                  <option value="echo">Echo</option>
+                  <option value="fable">Fable</option>
+                  <option value="onyx">Onyx</option>
+                  <option value="nova">Nova</option>
+                  <option value="shimmer">Shimmer</option>
+                </select>
+              </div>
+              <div>
+                <label>Speed:</label>
+                <input type="range" id="speedSlider" min="0.25" max="4" step="0.25" value="1">
+                <span id="speedValue">1.0x</span>
+              </div>
+            </div>
+            <button type="button" id="generateAudioBtn" style="background: #6f42c1;">🎤 Generate Audio</button>
+            <div id="audioLoading" class="loading" style="margin-top: 10px;">
+              <p>🎵 Generating audio... This may take a moment.</p>
+            </div>
+            <div id="audioPlayer" style="display: none; margin-top: 15px;">
+              <audio controls class="audio-player" id="generatedAudio"></audio>
+              <p style="font-size: 12px; color: #666; margin-top: 5px;" id="audioInfo"></p>
+            </div>
+          </div>
         </div>
       </section>
       
@@ -214,10 +317,42 @@
     <!-- Saved Scripts Tab -->
     <div id="saved-scripts" class="tab-content">
       <section>
-        <h2>💾 Saved Voice Scripts</h2>
+        <h2>💾 Saved Voice Scripts & Audio</h2>
         <select id="savedScriptsVideo" style="margin-bottom: 15px;">
           <option value="">-- Select a video to view scripts --</option>
         </select>
+        
+        <!-- Batch Audio Generation Section -->
+        <div id="batchAudioSection" class="batch-audio-section" style="display: none;">
+          <h3>🎵 Batch Audio Generation</h3>
+          <p>Generate audio for all scripts in this video at once.</p>
+          <div class="audio-settings">
+            <div>
+              <label>Voice for all scripts:</label>
+              <select id="batchVoiceSelect">
+                <option value="alloy">Alloy</option>
+                <option value="echo">Echo</option>
+                <option value="fable">Fable</option>
+                <option value="onyx">Onyx</option>
+                <option value="nova">Nova</option>
+                <option value="shimmer">Shimmer</option>
+              </select>
+            </div>
+            <div>
+              <label>Speed for all scripts:</label>
+              <input type="range" id="batchSpeedSlider" min="0.25" max="4" step="0.25" value="1">
+              <span id="batchSpeedValue">1.0x</span>
+            </div>
+          </div>
+          <button type="button" id="generateAllAudioBtn" style="background: #9c27b0;">🎼 Generate Audio for All Scripts</button>
+          <div id="batchProgress" style="display: none; margin-top: 10px;">
+            <div style="background: #e0e0e0; border-radius: 10px; overflow: hidden;">
+              <div id="progressBar" style="height: 20px; background: #4caf50; width: 0%; transition: width 0.3s;"></div>
+            </div>
+            <p id="progressText" style="text-align: center; margin-top: 5px;">Processing...</p>
+          </div>
+        </div>
+        
         <div id="savedScriptsList"></div>
         <button type="button" id="combineScriptsBtn" style="margin-top: 15px; background: #6f42c1; display: none;">🎬 View Combined Script</button>
       </section>
@@ -236,45 +371,46 @@
     </div>
   </div>
   
+  <!-- JavaScript will be added separately -->
   <script>
     const apiBase = "";
     let currentScriptData = null;
-    
+
     // Tab functionality
     function showTab(tabName) {
       // Hide all tab contents
       const tabContents = document.querySelectorAll('.tab-content');
       tabContents.forEach(content => content.classList.remove('active'));
-      
+
       // Remove active class from all tab buttons
       const tabButtons = document.querySelectorAll('.tab-button');
       tabButtons.forEach(button => button.classList.remove('active'));
-      
+
       // Show selected tab
       document.getElementById(tabName).classList.add('active');
-      
+
       // Add active class to clicked button
       event.target.classList.add('active');
-      
+
       // Load data for specific tabs
       if (tabName === 'script-generator' || tabName === 'saved-scripts') {
         loadVideos();
       }
     }
-    
+
     // Debug info
     document.getElementById("currentUrl").textContent = window.location.href;
     document.getElementById("apiBaseDisplay").textContent = apiBase || "empty (relative URLs)";
-    
+
     function updateDebug(message) {
       document.getElementById("lastResponse").textContent = message;
       console.log("Debug:", message);
     }
-    
+
     function showMessage(message, type = 'success') {
       const successDiv = document.getElementById("success");
       const errorDiv = document.getElementById("error");
-      
+
       if (type === 'success') {
         successDiv.textContent = message;
         successDiv.style.display = "block";
@@ -287,18 +423,18 @@
         setTimeout(() => errorDiv.style.display = "none", 8000);
       }
     }
-    
+
     // Enhanced fetch with error handling
     async function apiRequest(url, options = {}) {
       try {
         updateDebug(`Making request to: ${apiBase}${url}`);
         const response = await fetch(`${apiBase}${url}`, options);
-        
+
         if (!response.ok) {
           const errorText = await response.text();
           throw new Error(`HTTP ${response.status}: ${errorText}`);
         }
-        
+
         const data = await response.json();
         updateDebug(`Success: ${JSON.stringify(data).substring(0, 100)}...`);
         return data;
@@ -309,7 +445,7 @@
         throw error;
       }
     }
-    
+
     // Fetch and populate videos
     async function loadVideos() {
       try {
@@ -319,7 +455,7 @@
           document.getElementById("videoSelectScript"),
           document.getElementById("savedScriptsVideo")
         ];
-        
+
         selects.forEach(select => {
           if (select) {
             select.innerHTML = `<option value="">-- Select a video --</option>`;
@@ -328,26 +464,26 @@
             });
           }
         });
-        
+
         updateDebug(`Loaded ${videos.length} videos`);
       } catch (error) {
         updateDebug(`Failed to load videos: ${error.message}`);
       }
     }
-    
+
     // Add new video
     document.getElementById("videoForm").addEventListener("submit", async e => {
       e.preventDefault();
       try {
         const title = document.getElementById("title").value;
         const video_url = document.getElementById("video_url").value;
-        
+
         await apiRequest("/videos", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ title, video_url })
         });
-        
+
         document.getElementById("videoForm").reset();
         loadVideos();
         showMessage("Video created successfully!");
@@ -356,7 +492,7 @@
         updateDebug(`Failed to create video: ${error.message}`);
       }
     });
-    
+
     // Add annotation
     document.getElementById("annotationForm").addEventListener("submit", async e => {
       e.preventDefault();
@@ -365,18 +501,18 @@
         showMessage("Select a video first!", 'error');
         return; 
       }
-      
+
       try {
         const start_time = parseFloat(document.getElementById("start_time").value);
         const end_time = parseFloat(document.getElementById("end_time").value);
         const description = document.getElementById("description").value;
-        
+
         await apiRequest(`/videos/${videoId}/annotations`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ start_time, end_time, description })
         });
-        
+
         document.getElementById("annotationForm").reset();
         loadAnnotations(videoId);
         showMessage("Annotation created successfully!");
@@ -385,13 +521,13 @@
         updateDebug(`Failed to create annotation: ${error.message}`);
       }
     });
-    
+
     // Load annotations for selected video
     document.getElementById("videoSelect").addEventListener("change", e => {
       const videoId = e.target.value;
       if (videoId) loadAnnotations(videoId);
     });
-    
+
     async function loadAnnotations(videoId) {
       try {
         const annotations = await apiRequest(`/videos/${videoId}/annotations`);
@@ -399,357 +535,546 @@
         list.innerHTML = "";
         annotations.forEach(a => {
           list.innerHTML += `
-            <li style="position: relative; cursor: pointer;" onclick="openEditModal('${a.id}', ${a.start_time}, ${a.end_time}, '${a.description.replace(/'/g, "\\'")}')">
-              [${a.start_time}s - ${a.end_time}s] (Duration: ${a.duration}s) → ${a.description}
-              <span style="color: #007bff; font-size: 12px; margin-left: 10px;">✏️ Click to edit</span>
-            </li>`;
+        <li style="position: relative; cursor: pointer;" onclick="openEditModal('${a.id}', ${a.start_time}, ${a.end_time}, '${a.description.replace(/'/g, "\\'")}')">
+          [${a.start_time}s - ${a.end_time}s] (Duration: ${a.duration}s) → ${a.description}
+          <span style="color: #007bff; font-size: 12px; margin-left: 10px;">✏️ Click to edit</span>
+        </li>`;
         });
-        updateDebug(`Loaded ${annotations.length} annotations`);
-      } catch (error) {
-        updateDebug(`Failed to load annotations: ${error.message}`);
-      }
-    }
-    
-    // Edit annotation functions
-    function openEditModal(id, startTime, endTime, description) {
-      document.getElementById("editAnnotationId").value = id;
-      document.getElementById("editStartTime").value = startTime;
-      document.getElementById("editEndTime").value = endTime;
-      document.getElementById("editDescription").value = description;
-      document.getElementById("editModal").style.display = "block";
-    }
-    
-    function closeEditModal() {
-      document.getElementById("editModal").style.display = "none";
-    }
-    
-    // Edit form handler
-    document.getElementById("editAnnotationForm").addEventListener("submit", async (e) => {
-      e.preventDefault();
-      const id = document.getElementById("editAnnotationId").value;
-      const start_time = parseFloat(document.getElementById("editStartTime").value);
-      const end_time = parseFloat(document.getElementById("editEndTime").value);
-      const description = document.getElementById("editDescription").value;
-      
-      try {
-        await apiRequest(`/annotations/${id}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ start_time, end_time, description })
-        });
-        
-        closeEditModal();
-        const videoId = document.getElementById("videoSelect").value;
-        if (videoId) loadAnnotations(videoId);
-        showMessage("Annotation updated successfully!");
-        updateDebug("Annotation updated successfully");
-      } catch (error) {
-        updateDebug(`Failed to update annotation: ${error.message}`);
-      }
-    });
-    
-    // Cancel edit
-    document.getElementById("cancelEdit").addEventListener("click", closeEditModal);
-    
-    // Delete annotation
-    document.getElementById("deleteAnnotation").addEventListener("click", async () => {
-      if (!confirm("Are you sure you want to delete this annotation?")) return;
-      
-      const id = document.getElementById("editAnnotationId").value;
-      try {
-        await apiRequest(`/annotations/${id}`, { method: "DELETE" });
-        closeEditModal();
-        const videoId = document.getElementById("videoSelect").value;
-        if (videoId) loadAnnotations(videoId);
-        showMessage("Annotation deleted successfully!");
-        updateDebug("Annotation deleted successfully");
-      } catch (error) {
-        updateDebug(`Failed to delete annotation: ${error.message}`);
-      }
-    });
-    
-    // Close modal when clicking outside
-    document.getElementById("editModal").addEventListener("click", (e) => {
-      if (e.target.id === "editModal") closeEditModal();
-    });
-    
-    // ===== SCRIPT GENERATOR FUNCTIONALITY =====
-    
-    // Show/hide loading state
-    function setLoading(isLoading) {
-      document.getElementById("loading").style.display = isLoading ? "block" : "none";
-      document.getElementById("generateBtn").disabled = isLoading;
-      document.getElementById("generateBtn").textContent = isLoading ? "⏳ Generating..." : "🎯 Generate Script";
-    }
-    
-    // Display generated script
-    function displayScript(data) {
-      const metaDiv = document.getElementById("scriptMeta");
-      const textArea = document.getElementById("scriptText");
-      const outputDiv = document.getElementById("scriptOutput");
-      
-      metaDiv.innerHTML = `
-        <strong>📊 Script Details:</strong><br>
-        Duration: ${data.duration} seconds<br>
-        Word Count: ~${data.estimated_word_count} words<br>
-        Based on: "${data.annotation.substring(0, 100)}${data.annotation.length > 100 ? '...' : ''}"
-      `;
-      
-      textArea.value = data.script;
-      outputDiv.style.display = "block";
-      
-      // Store current script data for saving
-      currentScriptData = {
-        duration: data.duration,
-        annotation: data.annotation,
-        script: data.script
-      };
-      
-      // Scroll to results
-      outputDiv.scrollIntoView({ behavior: 'smooth' });
-    }
-    
-    // Generate script form handler
-    document.getElementById("scriptForm").addEventListener("submit", async (e) => {
-      e.preventDefault();
-      
-      const duration = parseFloat(document.getElementById("duration").value);
-      const annotation = document.getElementById("annotation").value.trim();
-      
-      if (!duration || !annotation) {
-        showMessage("Please fill in both duration and annotation fields.", 'error');
-        return;
-      }
-      
-      setLoading(true);
-      document.getElementById("scriptOutput").style.display = "none";
-      
-      try {
-        const data = await apiRequest("/generate-script", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ duration, annotation })
-        });
-        
-        displayScript(data);
-      } catch (error) {
-        showMessage(`Failed to generate script: ${error.message}`, 'error');
-      } finally {
-        setLoading(false);
-      }
-    });
-    
-    // Load annotations when video is selected (for script generator)
-    document.getElementById("videoSelectScript").addEventListener("change", async (e) => {
-      const videoId = e.target.value;
-      const annotationSelect = document.getElementById("annotationSelect");
-      
-      if (!videoId) {
-        annotationSelect.innerHTML = `<option value="">-- Select an annotation --</option>`;
-        return;
-      }
-      
-      try {
-        const annotations = await apiRequest(`/videos/${videoId}/annotations`);
-        annotationSelect.innerHTML = `<option value="">-- Select an annotation --</option>`;
-        annotations.forEach(a => {
-          annotationSelect.innerHTML += `
-            <option value='${JSON.stringify(a)}'>
-              [${a.start_time}s - ${a.end_time}s] ${a.description.substring(0, 50)}${a.description.length > 50 ? '...' : ''}
-            </option>`;
-        });
-      } catch (error) {
-        showMessage("Failed to load annotations", 'error');
-      }
-    });
-    
-    // Use selected annotation
-    document.getElementById("useAnnotationBtn").addEventListener("click", () => {
-      const annotationSelect = document.getElementById("annotationSelect");
-      const selectedValue = annotationSelect.value;
-      
-      if (!selectedValue) {
-        showMessage("Please select an annotation first", 'error');
-        return;
-      }
-      
-      try {
-        const annotation = JSON.parse(selectedValue);
-        document.getElementById("duration").value = annotation.duration;
-        document.getElementById("annotation").value = annotation.description;
-        
-        // Scroll to form
-        document.getElementById("scriptForm").scrollIntoView({ behavior: 'smooth' });
-        showMessage("Annotation loaded into form!");
-      } catch (error) {
-        showMessage("Error loading annotation data", 'error');
-      }
-    });
-    
-    // Save script button
-    document.getElementById("saveScriptBtn").addEventListener("click", async () => {
-      const videoSelect = document.getElementById("videoSelectScript");
-      const annotationSelect = document.getElementById("annotationSelect");
-      
-      if (!videoSelect.value) {
-        showMessage("Please select a video first", 'error');
-        return;
-      }
-      
-      if (!currentScriptData) {
-        showMessage("No script to save", 'error');
-        return;
-      }
-      
-      try {
-        const scriptData = {
-          video_id: videoSelect.value,
-          annotation_id: annotationSelect.value ? JSON.parse(annotationSelect.value).id : null,
-          duration: currentScriptData.duration,
-          original_annotation: currentScriptData.annotation,
-          generated_script: document.getElementById("scriptText").value,
-          order_index: Date.now() // Simple ordering by creation time
-        };
-        
-        await apiRequest("/voice-scripts", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(scriptData)
-        });
-        
-        showMessage("✅ Script saved successfully!");
-        // Switch to saved scripts tab and refresh
-        showTab('saved-scripts');
-        setTimeout(() => {
-          document.getElementById('savedScriptsVideo').value = videoSelect.value;
-          document.getElementById('savedScriptsVideo').dispatchEvent(new Event('change'));
-        }, 100);
-      } catch (error) {
-        showMessage(`Failed to save script: ${error.message}`, 'error');
-      }
-    });
-    
-    // Regenerate script
-    document.getElementById("regenerateBtn").addEventListener("click", () => {
-      if (currentScriptData) {
-        document.getElementById("duration").value = currentScriptData.duration;
-        document.getElementById("annotation").value = currentScriptData.annotation;
-        document.getElementById("scriptForm").dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
-      }
-    });
-    
-    // ===== SAVED SCRIPTS FUNCTIONALITY =====
-    
-    // Load saved scripts
-    document.getElementById("savedScriptsVideo").addEventListener("change", async (e) => {
-      const videoId = e.target.value;
-      if (videoId) {
-        loadSavedScripts(videoId);
-        document.getElementById("combineScriptsBtn").style.display = "block";
-      } else {
-        document.getElementById("savedScriptsList").innerHTML = "";
-        document.getElementById("combineScriptsBtn").style.display = "none";
-      }
-    });
-    
-    async function loadSavedScripts(videoId) {
-      try {
-        const scripts = await apiRequest(`/videos/${videoId}/voice-scripts`);
-        const container = document.getElementById("savedScriptsList");
-        
-        if (scripts.length === 0) {
-          container.innerHTML = "<p>No saved scripts for this video.</p>";
-          return;
+          updateDebug(`Loaded ${annotations.length} annotations`);
+        } catch (error) {
+          updateDebug(`Failed to load annotations: ${error.message}`);
         }
-        
-        container.innerHTML = scripts.map(script => `
-          <div style="border: 1px solid #dee2e6; border-radius: 8px; padding: 15px; margin: 10px 0; background: white;">
-            <div style="font-weight: bold; margin-bottom: 10px;">
-              Duration: ${script.duration}s | 
-              ${script.annotation_id ? 'From Annotation' : 'Manual Entry'}
-              <button onclick="editScript('${script.id}')" style="float: right; background: #ffc107; padding: 4px 8px; font-size: 12px;">✏️ Edit</button>
-              <button onclick="deleteScript('${script.id}', '${videoId}')" style="float: right; background: #dc3545; padding: 4px 8px; font-size: 12px; margin-right: 5px;">🗑️ Delete</button>
-            </div>
-            <div style="font-size: 14px; color: #666; margin-bottom: 10px;">
-              Based on: "${script.original_annotation.substring(0, 100)}${script.original_annotation.length > 100 ? '...' : ''}"
-            </div>
-            <textarea readonly style="width: 100%; height: 80px; border: 1px solid #ccc; border-radius: 4px; padding: 8px; font-size: 12px; resize: none;">${script.generated_script}</textarea>
-          </div>
-        `).join('');
-      } catch (error) {
-        showMessage("Failed to load saved scripts", 'error');
       }
-    }
-    
-    // Edit script function
-    window.editScript = async (scriptId) => {
-      const newScript = prompt("Edit the script:");
-      if (newScript !== null) {
+
+      // Edit annotation functions
+      function openEditModal(id, startTime, endTime, description) {
+        document.getElementById("editAnnotationId").value = id;
+        document.getElementById("editStartTime").value = startTime;
+        document.getElementById("editEndTime").value = endTime;
+        document.getElementById("editDescription").value = description;
+        document.getElementById("editModal").style.display = "block";
+      }
+
+      function closeEditModal() {
+        document.getElementById("editModal").style.display = "none";
+      }
+
+      // Edit form handler
+      document.getElementById("editAnnotationForm").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const id = document.getElementById("editAnnotationId").value;
+        const start_time = parseFloat(document.getElementById("editStartTime").value);
+        const end_time = parseFloat(document.getElementById("editEndTime").value);
+        const description = document.getElementById("editDescription").value;
+
         try {
-          await apiRequest(`/voice-scripts/${scriptId}`, {
+          await apiRequest(`/annotations/${id}`, {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ generated_script: newScript })
+            body: JSON.stringify({ start_time, end_time, description })
           });
-          const videoId = document.getElementById("savedScriptsVideo").value;
-          loadSavedScripts(videoId);
-          showMessage("Script updated successfully!");
+
+          closeEditModal();
+          const videoId = document.getElementById("videoSelect").value;
+          if (videoId) loadAnnotations(videoId);
+          showMessage("Annotation updated successfully!");
+          updateDebug("Annotation updated successfully");
         } catch (error) {
-          showMessage("Failed to update script", 'error');
+          updateDebug(`Failed to update annotation: ${error.message}`);
         }
-      }
-    };
-    
-    // Delete script function
-    window.deleteScript = async (scriptId, videoId) => {
-      if (confirm("Are you sure you want to delete this script?")) {
+      });
+
+      // Cancel edit
+      document.getElementById("cancelEdit").addEventListener("click", closeEditModal);
+
+      // Delete annotation
+      document.getElementById("deleteAnnotation").addEventListener("click", async () => {
+        if (!confirm("Are you sure you want to delete this annotation?")) return;
+
+        const id = document.getElementById("editAnnotationId").value;
         try {
-          await apiRequest(`/voice-scripts/${scriptId}`, { method: "DELETE" });
-          loadSavedScripts(videoId);
-          showMessage("Script deleted successfully!");
+          await apiRequest(`/annotations/${id}`, { method: "DELETE" });
+          closeEditModal();
+          const videoId = document.getElementById("videoSelect").value;
+          if (videoId) loadAnnotations(videoId);
+          showMessage("Annotation deleted successfully!");
+          updateDebug("Annotation deleted successfully");
         } catch (error) {
-          showMessage("Failed to delete script", 'error');
+          updateDebug(`Failed to delete annotation: ${error.message}`);
+        }
+      });
+
+      // Close modal when clicking outside
+      document.getElementById("editModal").addEventListener("click", (e) => {
+        if (e.target.id === "editModal") closeEditModal();
+      });
+
+      // ===== SCRIPT GENERATOR FUNCTIONALITY =====
+
+      // Show/hide loading state
+      function setLoading(isLoading) {
+        document.getElementById("loading").style.display = isLoading ? "block" : "none";
+        document.getElementById("generateBtn").disabled = isLoading;
+        document.getElementById("generateBtn").textContent = isLoading ? "⏳ Generating..." : "🎯 Generate Script";
+      }
+
+      // Display generated script
+      function displayScript(data) {
+        const metaDiv = document.getElementById("scriptMeta");
+        const textArea = document.getElementById("scriptText");
+        const outputDiv = document.getElementById("scriptOutput");
+
+        metaDiv.innerHTML = `
+    <strong>📊 Script Details:</strong><br>
+    Duration: ${data.duration} seconds<br>
+    Word Count: ~${data.estimated_word_count} words<br>
+    Based on: "${data.annotation.substring(0, 100)}${data.annotation.length > 100 ? '...' : ''}"
+  `;
+
+        textArea.value = data.script;
+        outputDiv.style.display = "block";
+
+        // Store current script data for saving
+        currentScriptData = {
+          duration: data.duration,
+          annotation: data.annotation,
+          script: data.script
+        };
+
+        // Scroll to results
+        outputDiv.scrollIntoView({ behavior: 'smooth' });
+      }
+
+      // Generate script form handler
+      document.getElementById("scriptForm").addEventListener("submit", async (e) => {
+        e.preventDefault();
+
+        const duration = parseFloat(document.getElementById("duration").value);
+        const annotation = document.getElementById("annotation").value.trim();
+
+        if (!duration || !annotation) {
+          showMessage("Please fill in both duration and annotation fields.", 'error');
+          return;
+        }
+
+        setLoading(true);
+        document.getElementById("scriptOutput").style.display = "none";
+
+        try {
+          const data = await apiRequest("/generate-script", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ duration, annotation })
+          });
+
+          displayScript(data);
+        } catch (error) {
+          showMessage(`Failed to generate script: ${error.message}`, 'error');
+        } finally {
+          setLoading(false);
+        }
+      });
+
+      // Load annotations when video is selected (for script generator)
+      document.getElementById("videoSelectScript").addEventListener("change", async (e) => {
+        const videoId = e.target.value;
+        const annotationSelect = document.getElementById("annotationSelect");
+
+        if (!videoId) {
+          annotationSelect.innerHTML = `<option value="">-- Select an annotation --</option>`;
+          return;
+        }
+
+        try {
+          const annotations = await apiRequest(`/videos/${videoId}/annotations`);
+          annotationSelect.innerHTML = `<option value="">-- Select an annotation --</option>`;
+          annotations.forEach(a => {
+            annotationSelect.innerHTML += `
+        <option value='${JSON.stringify(a)}'>
+          [${a.start_time}s - ${a.end_time}s] ${a.description.substring(0, 50)}${a.description.length > 50 ? '...' : ''}
+        </option>`;
+          });
+        } catch (error) {
+          showMessage("Failed to load annotations", 'error');
+        }
+      });
+
+      // Use selected annotation
+      document.getElementById("useAnnotationBtn").addEventListener("click", () => {
+        const annotationSelect = document.getElementById("annotationSelect");
+        const selectedValue = annotationSelect.value;
+
+        if (!selectedValue) {
+          showMessage("Please select an annotation first", 'error');
+          return;
+        }
+
+        try {
+          const annotation = JSON.parse(selectedValue);
+          document.getElementById("duration").value = annotation.duration;
+          document.getElementById("annotation").value = annotation.description;
+
+          // Scroll to form
+          document.getElementById("scriptForm").scrollIntoView({ behavior: 'smooth' });
+          showMessage("Annotation loaded into form!");
+        } catch (error) {
+          showMessage("Error loading annotation data", 'error');
+        }
+      });
+
+      // Save script button
+      document.getElementById("saveScriptBtn").addEventListener("click", async () => {
+        const videoSelect = document.getElementById("videoSelectScript");
+        const annotationSelect = document.getElementById("annotationSelect");
+
+        if (!videoSelect.value) {
+          showMessage("Please select a video first", 'error');
+          return;
+        }
+
+        if (!currentScriptData) {
+          showMessage("No script to save", 'error');
+          return;
+        }
+
+        try {
+          const scriptData = {
+            video_id: videoSelect.value,
+            annotation_id: annotationSelect.value ? JSON.parse(annotationSelect.value).id : null,
+            duration: currentScriptData.duration,
+            original_annotation: currentScriptData.annotation,
+            generated_script: document.getElementById("scriptText").value,
+            order_index: Date.now() // Simple ordering by creation time
+          };
+
+          await apiRequest("/voice-scripts", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(scriptData)
+          });
+
+          showMessage("✅ Script saved successfully!");
+          // Switch to saved scripts tab and refresh
+          showTab('saved-scripts');
+          setTimeout(() => {
+            document.getElementById('savedScriptsVideo').value = videoSelect.value;
+            document.getElementById('savedScriptsVideo').dispatchEvent(new Event('change'));
+          }, 100);
+        } catch (error) {
+          showMessage(`Failed to save script: ${error.message}`, 'error');
+        }
+      });
+
+      // Regenerate script
+      document.getElementById("regenerateBtn").addEventListener("click", () => {
+        if (currentScriptData) {
+          document.getElementById("duration").value = currentScriptData.duration;
+          document.getElementById("annotation").value = currentScriptData.annotation;
+          document.getElementById("scriptForm").dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
+        }
+      });
+
+      // ===== AUDIO GENERATION FUNCTIONALITY =====
+
+        // Speed slider functionality
+      document.getElementById("speedSlider").addEventListener("input", (e) => {
+        document.getElementById("speedValue").textContent = `${e.target.value}x`;
+      });
+
+      document.getElementById("batchSpeedSlider").addEventListener("input", (e) => {
+        document.getElementById("batchSpeedValue").textContent = `${e.target.value}x`;
+      });
+
+      // Generate audio for current script
+      document.getElementById("generateAudioBtn").addEventListener("click", async () => {
+        if (!currentScriptData) {
+          showMessage("Please generate a script first", 'error');
+          return;
+        }
+
+        const voice = document.getElementById("voiceSelect").value;
+        const speed = parseFloat(document.getElementById("speedSlider").value);
+        const scriptText = document.getElementById("scriptText").value;
+
+        document.getElementById("audioLoading").style.display = "block";
+        document.getElementById("generateAudioBtn").disabled = true;
+        document.getElementById("audioPlayer").style.display = "none";
+
+        try {
+          const audioData = await apiRequest("/generate-audio", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              text: scriptText,
+              voice: voice,
+              speed: speed
+            })
+          });
+
+          // Create audio element and play
+          const audioElement = document.getElementById("generatedAudio");
+          const audioBlob = new Blob([Uint8Array.from(atob(audioData.audio_base64), c => c.charCodeAt(0))], { type: 'audio/mpeg' });
+          const audioUrl = URL.createObjectURL(audioBlob);
+
+          audioElement.src = audioUrl;
+          document.getElementById("audioPlayer").style.display = "block";
+
+          // Update audio info
+          document.getElementById("audioInfo").innerHTML = `
+          File: ${audioData.filename} | Size: ${(audioData.size_bytes / 1024).toFixed(1)} KB | 
+            Voice: ${audioData.voice} | Speed: ${audioData.speed}x
+          `;
+
+          showMessage("🎵 Audio generated successfully!");
+
+        } catch (error) {
+          showMessage(`Failed to generate audio: ${error.message}`, 'error');
+        } finally {
+          document.getElementById("audioLoading").style.display = "none";
+          document.getElementById("generateAudioBtn").disabled = false;
+        }
+      });
+
+      // ===== SAVED SCRIPTS FUNCTIONALITY =====
+
+        // Load saved scripts
+      document.getElementById("savedScriptsVideo").addEventListener("change", async (e) => {
+        const videoId = e.target.value;
+        if (videoId) {
+          loadSavedScripts(videoId);
+          document.getElementById("combineScriptsBtn").style.display = "block";
+          document.getElementById("batchAudioSection").style.display = "block";
+        } else {
+          document.getElementById("savedScriptsList").innerHTML = "";
+          document.getElementById("combineScriptsBtn").style.display = "none";
+          document.getElementById("batchAudioSection").style.display = "none";
+        }
+      });
+
+      async function loadSavedScripts(videoId) {
+        try {
+          const scripts = await apiRequest(`/videos/${videoId}/voice-scripts`);
+          const container = document.getElementById("savedScriptsList");
+
+          if (scripts.length === 0) {
+            container.innerHTML = "<p>No saved scripts for this video.</p>";
+            return;
+          }
+
+          container.innerHTML = scripts.map(script => `
+            <div class="script-item ${script.has_audio ? 'has-audio' : ''}">
+            <div class="script-header">
+            <div>
+            Duration: ${script.duration}s | 
+            ${script.annotation_id ? 'From Annotation' : 'Manual Entry'}
+            <span class="audio-status ${script.has_audio ? 'available' : 'unavailable'}">
+            ${script.has_audio ? '🎵 Audio Available' : '🔇 No Audio'}
+            </span>
+            </div>
+            <div class="script-actions-inline">
+            ${script.has_audio ? 
+                `<button onclick="playScriptAudio('${script.id}')" style="background: #28a745;">▶️ Play</button>
+                <button onclick="deleteScriptAudio('${script.id}', '${videoId}')" style="background: #ffc107;">🗑️ Delete Audio</button>` : 
+                `<button onclick="generateScriptAudio('${script.id}', '${videoId}')" style="background: #6f42c1;">🎤 Generate Audio</button>`
+            }
+            <button onclick="editScript('${script.id}')" style="background: #ffc107;">✏️ Edit</button>
+            <button onclick="deleteScript('${script.id}', '${videoId}')" style="background: #dc3545;">🗑️ Delete</button>
+            </div>
+            </div>
+            <div style="font-size: 14px; color: #666; margin-bottom: 10px;">
+            Based on: "${script.original_annotation.substring(0, 100)}${script.original_annotation.length > 100 ? '...' : ''}"
+            </div>
+            <textarea readonly style="width: 100%; height: 80px; border: 1px solid #ccc; border-radius: 4px; padding: 8px; font-size: 12px; resize: none;">${script.generated_script}</textarea>
+            ${script.has_audio ? `
+                <div style="margin-top: 10px; font-size: 12px; color: #666;">
+              Audio: ${script.audio_voice} voice, ${script.audio_speed}x speed, ${(script.audio_size_bytes / 1024).toFixed(1)} KB
+                </div>` : ''}
+            </div>
+            `).join('');
+        } catch (error) {
+          showMessage("Failed to load saved scripts", 'error');
         }
       }
-    };
-    
-    // View combined script
-    document.getElementById("combineScriptsBtn").addEventListener("click", async () => {
-      const videoId = document.getElementById("savedScriptsVideo").value;
-      if (!videoId) return;
-      
-      try {
-        const combined = await apiRequest(`/videos/${videoId}/combined-script`);
-        
-        document.getElementById("combinedScriptMeta").innerHTML = `
-          <strong>📊 Combined Script Summary:</strong><br>
+
+      // Generate audio for individual script
+      window.generateScriptAudio = async (scriptId, videoId) => {
+        const voice = prompt("Select voice (alloy, echo, fable, onyx, nova, shimmer):", "alloy");
+        if (!voice) return;
+
+        const speed = prompt("Select speed (0.25-4.0):", "1.0");
+        if (!speed) return;
+
+        try {
+          const audioData = await apiRequest(`/voice-scripts/${scriptId}/generate-audio`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              voice: voice,
+              speed: parseFloat(speed)
+            })
+          });
+
+          showMessage("🎵 Audio generated successfully!");
+          loadSavedScripts(videoId);
+        } catch (error) {
+          showMessage(`Failed to generate audio: ${error.message}`, 'error');
+        }
+      };
+
+      // Play script audio
+      window.playScriptAudio = async (scriptId) => {
+        try {
+          const audioData = await apiRequest(`/voice-scripts/${scriptId}/audio`);
+
+          // Create and play audio
+          const audioBlob = new Blob([Uint8Array.from(atob(audioData.audio_base64), c => c.charCodeAt(0))], { type: 'audio/mpeg' });
+          const audioUrl = URL.createObjectURL(audioBlob);
+
+          const audio = new Audio(audioUrl);
+          audio.play();
+
+          showMessage(`🎵 Playing audio (${audioData.voice} voice, ${audioData.speed}x speed)`);
+        } catch (error) {
+          showMessage(`Failed to play audio: ${error.message}`, 'error');
+        }
+      };
+
+      // Delete script audio
+      window.deleteScriptAudio = async (scriptId, videoId) => {
+        if (!confirm("Are you sure you want to delete the audio for this script?")) return;
+
+        try {
+          await apiRequest(`/voice-scripts/${scriptId}/audio`, { method: "DELETE" });
+          showMessage("Audio deleted successfully!");
+          loadSavedScripts(videoId);
+        } catch (error) {
+          showMessage(`Failed to delete audio: ${error.message}`, 'error');
+        }
+      };
+
+      // Batch audio generation
+      document.getElementById("generateAllAudioBtn").addEventListener("click", async () => {
+        const videoId = document.getElementById("savedScriptsVideo").value;
+        if (!videoId) return;
+
+        const voice = document.getElementById("batchVoiceSelect").value;
+        const speed = parseFloat(document.getElementById("batchSpeedSlider").value);
+
+        if (!confirm(`Generate audio for all scripts using ${voice} voice at ${speed}x speed?`)) return;
+
+        document.getElementById("batchProgress").style.display = "block";
+        document.getElementById("generateAllAudioBtn").disabled = true;
+
+        try {
+          const result = await apiRequest(`/videos/${videoId}/generate-all-audio`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              voice: voice,
+              speed: speed
+            })
+          });
+
+          // Update progress
+          const successRate = (result.successful / (result.successful + result.failed)) * 100;
+          document.getElementById("progressBar").style.width = "100%";
+          document.getElementById("progressText").textContent = 
+            `Complete! ${result.successful} successful, ${result.failed} failed`;
+
+          if (result.failed > 0) {
+            showMessage(`⚠️ Batch generation completed with ${result.failed} errors. Check console for details.`, 'error');
+            console.log("Batch generation errors:", result.errors);
+          } else {
+            showMessage(`🎉 Successfully generated audio for all ${result.successful} scripts!`);
+          }
+
+          // Reload scripts to show updated audio status
+          loadSavedScripts(videoId);
+
+        } catch (error) {
+          showMessage(`Batch generation failed: ${error.message}`, 'error');
+        } finally {
+          document.getElementById("generateAllAudioBtn").disabled = false;
+          setTimeout(() => {
+            document.getElementById("batchProgress").style.display = "none";
+            document.getElementById("progressBar").style.width = "0%";
+          }, 3000);
+        }
+      });
+
+      // Edit script function
+      window.editScript = async (scriptId) => {
+        const newScript = prompt("Edit the script:");
+        if (newScript !== null) {
+          try {
+            await apiRequest(`/voice-scripts/${scriptId}`, {
+              method: "PUT",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ generated_script: newScript })
+            });
+            const videoId = document.getElementById("savedScriptsVideo").value;
+            loadSavedScripts(videoId);
+            showMessage("Script updated successfully!");
+          } catch (error) {
+            showMessage("Failed to update script", 'error');
+          }
+        }
+      };
+
+      // Delete script function
+      window.deleteScript = async (scriptId, videoId) => {
+        if (confirm("Are you sure you want to delete this script?")) {
+          try {
+            await apiRequest(`/voice-scripts/${scriptId}`, { method: "DELETE" });
+            loadSavedScripts(videoId);
+            showMessage("Script deleted successfully!");
+          } catch (error) {
+            showMessage("Failed to delete script", 'error');
+          }
+        }
+      };
+
+      // View combined script
+      document.getElementById("combineScriptsBtn").addEventListener("click", async () => {
+        const videoId = document.getElementById("savedScriptsVideo").value;
+        if (!videoId) return;
+
+        try {
+          const combined = await apiRequest(`/videos/${videoId}/combined-script`);
+
+          document.getElementById("combinedScriptMeta").innerHTML = `
+            <strong>📊 Combined Script Summary:</strong><br>
           Total Duration: ${combined.total_duration} seconds<br>
           Number of Scripts: ${combined.script_count}<br>
           Estimated Total Words: ~${combined.combined_script.split(' ').length}
-        `;
-        
-        document.getElementById("combinedScriptText").value = combined.combined_script;
-        document.getElementById("combinedModal").style.display = "block";
-      } catch (error) {
-        showMessage("Failed to load combined script", 'error');
-      }
-    });
-    
-    // Close combined modal
-    document.getElementById("closeCombinedModal").addEventListener("click", () => {
-      document.getElementById("combinedModal").style.display = "none";
-    });
-    
-    // Close modal when clicking outside
-    document.getElementById("combinedModal").addEventListener("click", (e) => {
-      if (e.target.id === "combinedModal") {
+          `;
+
+          document.getElementById("combinedScriptText").value = combined.combined_script;
+          document.getElementById("combinedModal").style.display = "block";
+        } catch (error) {
+          showMessage("Failed to load combined script", 'error');
+        }
+      });
+
+      // Close combined modal
+      document.getElementById("closeCombinedModal").addEventListener("click", () => {
         document.getElementById("combinedModal").style.display = "none";
-      }
-    });
-    
-    // Initial load
-    updateDebug("Page loaded, attempting to load videos...");
-    loadVideos();
+      });
+
+      // Close modal when clicking outside
+      document.getElementById("combinedModal").addEventListener("click", (e) => {
+        if (e.target.id === "combinedModal") {
+          document.getElementById("combinedModal").style.display = "none";
+        }
+      });
+
+      // Initial load
+      updateDebug("Page loaded, attempting to load videos...");
+      loadVideos();
+
+    // JavaScript code will go here in the next part
+
+
   </script>
 </body>
 </html>

@@ -8,11 +8,14 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from dotenv import load_dotenv
 from supabase import create_client, Client
-from models import VideoCreate, AnnotationCreate, Annotation, ScriptGenerateRequest, VoiceScriptCreate, VoiceScript
+from models import VideoCreate, AnnotationCreate, Annotation, ScriptGenerateRequest, VoiceScriptCreate, VoiceScript, AudioGenerateRequest
 from typing import List
 import uvicorn
 from fastapi.middleware.cors import CORSMiddleware
 import openai
+import base64
+import uuid
+from io import BytesIO
 
 
 # Load env vars
@@ -156,7 +159,7 @@ def get_combined_script(video_id: str):
         "scripts": scripts
     }
 
-# --- New OpenAI Script Generation Endpoint ---
+# --- OpenAI Script Generation Endpoint ---
 
 @app.post("/generate-script")
 async def generate_script(request: ScriptGenerateRequest):
@@ -193,6 +196,7 @@ async def generate_script(request: ScriptGenerateRequest):
 
         script = response.choices[0].message.content.strip()
 
+
         return {
             "script": script,
             "duration": request.duration,
@@ -202,6 +206,227 @@ async def generate_script(request: ScriptGenerateRequest):
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error generating script: {str(e)}")
+
+# --- NEW: Audio Generation Endpoints ---
+
+@app.post("/generate-audio")
+async def generate_audio(request: AudioGenerateRequest):
+    """Generate audio from text using OpenAI's text-to-speech API"""
+    if not OPENAI_API_KEY:
+        raise HTTPException(status_code=500, detail="OpenAI API key not configured")
+
+    try:
+        # Generate audio using OpenAI's TTS API
+        response = openai.audio.speech.create(
+            model="tts-1",  # or "tts-1-hd" for higher quality
+            voice=request.voice,  # alloy, echo, fable, onyx, nova, shimmer
+            input=request.text,
+            response_format="mp3",
+            speed=request.speed  # 0.25 to 4.0, default is 1.0
+        )
+
+        # Convert the audio response to base64
+        audio_data = response.content
+        audio_base64 = base64.b64encode(audio_data).decode('utf-8')
+
+        # Generate a unique filename
+        audio_filename = f"audio_{uuid.uuid4().hex}.mp3"
+
+        return {
+            "audio_base64": audio_base64,
+            "filename": audio_filename,
+            "size_bytes": len(audio_data),
+            "voice": request.voice,
+            "speed": request.speed,
+            "text_length": len(request.text)
+        }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error generating audio: {str(e)}")
+
+@app.post("/voice-scripts/{script_id}/generate-audio")
+async def generate_audio_for_script(script_id: str, request: AudioGenerateRequest):
+    """Generate audio for a specific voice script and save it to the database"""
+    if not OPENAI_API_KEY:
+        raise HTTPException(status_code=500, detail="OpenAI API key not configured")
+
+    try:
+        # First, get the voice script
+        script_data = supabase.table("voice_scripts").select("*").eq("id", script_id).execute()
+        if not script_data.data:
+            raise HTTPException(status_code=404, detail="Voice script not found")
+
+        script = script_data.data[0]
+
+        # Use the script text if no custom text provided
+        text_to_convert = request.text if request.text else script["generated_script"]
+
+        # Generate audio using OpenAI's TTS API
+        response = openai.audio.speech.create(
+            model="tts-1",  # or "tts-1-hd" for higher quality
+            voice=request.voice,
+            input=text_to_convert,
+            response_format="mp3",
+            speed=request.speed
+        )
+
+        # Convert the audio response to base64
+        audio_data = response.content
+        audio_base64 = base64.b64encode(audio_data).decode('utf-8')
+
+        # Generate a unique filename
+        audio_filename = f"script_{script_id}_{uuid.uuid4().hex}.mp3"
+
+        # Update the voice script with audio data
+        update_data = {
+            "audio_base64": audio_base64,
+            "audio_filename": audio_filename,
+            "audio_voice": request.voice,
+            "audio_speed": request.speed,
+            "audio_size_bytes": len(audio_data),
+            "has_audio": True
+        }
+
+        updated_script = supabase.table("voice_scripts").update(update_data).eq("id", script_id).execute()
+
+        if not updated_script.data:
+            raise HTTPException(status_code=500, detail="Error updating script with audio data")
+
+        return {
+            "message": "Audio generated and saved successfully",
+            "script_id": script_id,
+            "audio_filename": audio_filename,
+            "audio_base64": audio_base64,
+            "size_bytes": len(audio_data),
+            "voice": request.voice,
+            "speed": request.speed,
+            "script_data": updated_script.data[0]
+        }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error generating audio for script: {str(e)}")
+
+@app.get("/voice-scripts/{script_id}/audio")
+async def get_script_audio(script_id: str):
+    """Get the audio data for a specific voice script"""
+    try:
+        script_data = supabase.table("voice_scripts").select("*").eq("id", script_id).execute()
+
+        if not script_data.data:
+            raise HTTPException(status_code=404, detail="Voice script not found")
+
+        script = script_data.data[0]
+
+        if not script.get("has_audio") or not script.get("audio_base64"):
+            raise HTTPException(status_code=404, detail="No audio available for this script")
+
+        return {
+            "audio_base64": script["audio_base64"],
+            "filename": script["audio_filename"],
+            "voice": script["audio_voice"],
+            "speed": script["audio_speed"],
+            "size_bytes": script["audio_size_bytes"]
+        }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error retrieving audio: {str(e)}")
+
+@app.delete("/voice-scripts/{script_id}/audio")
+async def delete_script_audio(script_id: str):
+    """Delete the audio data for a specific voice script"""
+    try:
+        # Remove audio data from the script
+        update_data = {
+            "audio_base64": None,
+            "audio_filename": None,
+            "audio_voice": None,
+            "audio_speed": None,
+            "audio_size_bytes": None,
+            "has_audio": False
+        }
+
+        updated_script = supabase.table("voice_scripts").update(update_data).eq("id", script_id).execute()
+
+        if not updated_script.data:
+            raise HTTPException(status_code=404, detail="Voice script not found")
+
+        return {"message": "Audio deleted successfully"}
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error deleting audio: {str(e)}")
+
+# --- Batch Audio Generation ---
+
+@app.post("/videos/{video_id}/generate-all-audio")
+async def generate_audio_for_all_scripts(video_id: str, request: AudioGenerateRequest):
+    """Generate audio for all voice scripts in a video"""
+    if not OPENAI_API_KEY:
+        raise HTTPException(status_code=500, detail="OpenAI API key not configured")
+
+    try:
+        # Get all voice scripts for the video
+        scripts_data = supabase.table("voice_scripts").select("*").eq("video_id", video_id).order("order_index").execute()
+
+        if not scripts_data.data:
+            raise HTTPException(status_code=404, detail="No voice scripts found for this video")
+
+        results = []
+        errors = []
+
+        for script in scripts_data.data:
+            try:
+                # Generate audio for each script
+                response = openai.audio.speech.create(
+                    model="tts-1",
+                    voice=request.voice,
+                    input=script["generated_script"],
+                    response_format="mp3",
+                    speed=request.speed
+                )
+
+                # Convert to base64
+                audio_data = response.content
+                audio_base64 = base64.b64encode(audio_data).decode('utf-8')
+                audio_filename = f"script_{script['id']}_{uuid.uuid4().hex}.mp3"
+
+                # Update the script
+                update_data = {
+                    "audio_base64": audio_base64,
+                    "audio_filename": audio_filename,
+                    "audio_voice": request.voice,
+                    "audio_speed": request.speed,
+                    "audio_size_bytes": len(audio_data),
+                    "has_audio": True
+                }
+
+                supabase.table("voice_scripts").update(update_data).eq("id", script["id"]).execute()
+
+                results.append({
+                    "script_id": script["id"],
+                    "filename": audio_filename,
+                    "size_bytes": len(audio_data),
+                    "success": True
+                })
+
+            except Exception as e:
+                errors.append({
+                    "script_id": script["id"],
+                    "error": str(e),
+                    "success": False
+                })
+
+        return {
+            "message": f"Processed {len(scripts_data.data)} scripts",
+            "successful": len(results),
+            "failed": len(errors),
+            "results": results,
+            "errors": errors,
+            "voice": request.voice,
+            "speed": request.speed
+        }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error in batch audio generation: {str(e)}")
 
 if __name__ == "__main__":
     uvicorn.run(app, port=8000)
